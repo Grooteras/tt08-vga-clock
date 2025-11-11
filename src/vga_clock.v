@@ -2,7 +2,7 @@
 module vga_clock (
     input wire clk, 
     input wire reset_n,
-    input wire adj_hrs,
+    input wire adj_days,
     input wire adj_min,
     input wire adj_sec,
     output wire hsync,
@@ -16,8 +16,9 @@ module vga_clock (
     reg [2:0] sec_d;
     reg [3:0] min_u;
     reg [2:0] min_d;
-    reg [3:0] hrs_u;
-    reg [1:0] hrs_d;
+    reg [3:0] days_u;
+    reg [3:0] days_m;
+    reg [1:0] days_d;
     reg [25:0] sec_counter;
 
     always @(posedge px_clk) begin
@@ -26,8 +27,9 @@ module vga_clock (
             sec_d <= 0;
             min_u <= 0;
             min_d <= 0;
-            hrs_u <= 0;
-            hrs_d <= 0;
+            days_u <= 0;
+            days_m <= 0
+            days_d <= 0;
             sec_counter <= 0;
             color_offset <= 0;
         end else begin
@@ -44,17 +46,22 @@ module vga_clock (
                 min_u <= 0;
                 min_d <= min_d + 1;
             end
-            if(min_d == 6) begin
+            if(min_d == 2 && min_u == 0) begin
                 min_d <= 0;
-                hrs_u <= hrs_u + 1;
+                days_u <= days_u + 1;
             end
-            if(hrs_u == 10) begin
-                hrs_u <= 0;
-                hrs_d <= hrs_d + 1;
+            if(days_u == 10) begin
+                days_u <= 0;
+                days_m <= days_m + 1;
             end
-            if(hrs_d == 2 && hrs_u == 4) begin
-                hrs_u <= 0;
-                hrs_d <= 0;
+            if(days_m == 10) begin
+                days_m <= 0;
+                days_d <= days_d+1;
+            end
+            if(days_u == 5 && days_m == 6 && days_d == 3) begin
+                days_u <= 0;
+                days_m <= 0;
+                days_d <= 0;
             end
 
             // second counter
@@ -71,12 +78,12 @@ module vga_clock (
                 min_u <= min_u + 1;
                 color_offset <= color_offset + 1;
             end
-            if(adj_hrs_pulse)
-                hrs_u <= hrs_u + 1;
+            if(adj_days_pulse)
+                days_u <= days_u + 1;
         end
     end
 
-    wire adj_sec_pulse, adj_min_pulse, adj_hrs_pulse;
+    wire adj_sec_pulse, adj_min_pulse, adj_days_pulse;
 
     // want button_clk_en to be about 10ms
     // frame rate is 70hz is 15ms
@@ -90,12 +97,12 @@ module vga_clock (
     button_pulse #(.MIN_COUNT(MIN_COUNT), .DEC_COUNT(DEC_COUNT), .MAX_COUNT(MAX_BUT_RATE)) 
         pulse_min (.clk(px_clk), .clk_en(but_clk_en), .button(adj_min), .pulse(adj_min_pulse), .reset(reset));
     button_pulse #(.MIN_COUNT(MIN_COUNT), .DEC_COUNT(DEC_COUNT), .MAX_COUNT(MAX_BUT_RATE)) 
-        pulse_hrs (.clk(px_clk), .clk_en(but_clk_en), .button(adj_hrs), .pulse(adj_hrs_pulse), .reset(reset));
+    pulse_days (.clk(px_clk), .clk_en(but_clk_en), .button(adj_days), .pulse(adj_days_pulse), .reset(reset));
 
     // these are in blocks
     localparam OFFSET_Y_BLK = 0;
     localparam OFFSET_X_BLK = 1;
-    localparam NUM_CHARS = 8;
+    localparam NUM_CHARS = 9;
     localparam FONT_W = 4;
     localparam FONT_H = 5;
     localparam COLON = 10;
@@ -140,14 +147,15 @@ module vga_clock (
     digit #(.FONT_W(FONT_W), .FONT_H(FONT_H), .NUM_BLOCKS(NUM_CHARS*FONT_W)) digit_0 (.clk(px_clk), .x_block(x_block), .number(number), .digit_index(digit_index), .col_index(col_index), .color(color), .color_offset(color_offset));
 
     /* verilator lint_off WIDTH */
-    assign number     = x_block < FONT_W * 1 ? hrs_d :
-                        x_block < FONT_W * 2 ? hrs_u :
-                        x_block < FONT_W * 3 ? COLON :
-                        x_block < FONT_W * 4 ? min_d :
-                        x_block < FONT_W * 5 ? min_u :
-                        x_block < FONT_W * 6 ? COLON :
-                        x_block < FONT_W * 7 ? sec_d :
-                        x_block < FONT_W * 8 ? sec_u :
+    assign number     = x_block < FONT_W * 1 ? days_d :
+                        x_block < FONT_W * 2 ? days_m :
+                        x_block < FONT_W * 3 ? days_u :
+                        x_block < FONT_W * 4 ? COLON :
+                        x_block < FONT_W * 5 ? min_d :
+                        x_block < FONT_W * 6 ? min_u :
+                        x_block < FONT_W * 7 ? COLON :
+                        x_block < FONT_W * 8 ? sec_d :
+                        x_block < FONT_W * 9 ? sec_u :
                         BLANK;
     /* verilator lint_on WIDTH */
    
